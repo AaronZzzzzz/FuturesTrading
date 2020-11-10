@@ -9,7 +9,7 @@ rqd.init()
 
 START_DATE = datetime.date(2010, 1, 1)
 
-def update_market_data(sym, path = None):
+def update_market_data(sym, end_date = None, path = None):
     """ Function to update market data """
 
     # set up directory
@@ -26,6 +26,9 @@ def update_market_data(sym, path = None):
     
     # set start date
     update_date = calendar.index.max() + datetime.timedelta(1) if len(calendar) > 0 else START_DATE 
+
+    # set end date
+    end_date = datetime.date.today() if end_date is None else end_date
     
     # set fields
     fields = [
@@ -38,7 +41,7 @@ def update_market_data(sym, path = None):
     ]
 
     # update for each date
-    while update_date <= datetime.date.today():
+    while update_date <= end_date:
         
         # datetime to string
         dt_str = update_date.strftime('%Y-%m-%d')
@@ -67,7 +70,7 @@ def update_market_data(sym, path = None):
             data_by_sym = {k: v for k, v in data_by_sym.items() if len(v) > 0}
             
             # update calendar
-            calendar.set_value(pd.to_datetime(update_date), dt_str)
+            calendar.at[pd.to_datetime(update_date)] = dt_str
 
             # update liquidity
             liquidity_data = {k: v['open_interest'].iloc[-1] for k, v in data_by_sym.items()}
@@ -87,4 +90,10 @@ def update_market_data(sym, path = None):
         update_date += datetime.timedelta(1)
 
 if __name__ == "__main__":
-    update_market_data('RB')    
+    # update_market_data('AG', end_date = datetime.date(2020, 9, 18))
+    update_market_data('P', end_date = datetime.date(2020, 9, 18))
+    update_market_data('AU', end_date = datetime.date(2020, 9, 18))
+    
+    update_market_data('J', end_date = datetime.date(2020, 9, 18))
+    update_market_data('I', end_date = datetime.date(2020, 9, 18))
+    update_market_data('NI', end_date = datetime.date(2020, 9, 18))

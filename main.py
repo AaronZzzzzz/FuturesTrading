@@ -1,139 +1,178 @@
 
+# cython setup
+import pyximport
+pyximport.install(reload_support= True)
 
+import time
 import datetime
-import itertools
+
+import importlib
 import pandas as pd
-import numpy  as np
+from data  import FuturesData
+# from optimizer          import PortfolioOptimizer 
+from utils.utils              import backtest_analytics
+from backtester.kplot              import kplot
 
-from data.process_data  import FuturesData
-from strategy           import SMA, RSI
-from optimizer          import PortfolioOptimizer 
-from kplot              import kplot
+import strategies.cstrategy
+import backtester.cbacktest
+# import cdata
+importlib.reload(strategies.cstrategy)
+importlib.reload(backtester.cbacktest)
+# importlib.reload(cdata)
+import strategies.cstrategy
+import backtester.cbacktest
+# import cdata
 
-START_DATE = datetime.date(2019, 6, 1)
-END_DATE   = datetime.date(2019, 10, 30)
+
+# backtest range
+DATA_DATE  = datetime.date(2019, 12, 15)
+START_DATE = datetime.date(2020, 1, 1)
+# END_DATE   = datetime.date(2019, 2, 11)
+END_DATE   = datetime.date(2020, 9, 15)
 
 # get data
 fd = FuturesData(
     sym        = 'RB',
-    start_date = START_DATE,
+    start_date = DATA_DATE,
     end_date   = END_DATE, 
 )
 
-# generate and optimize strategies
-# generator_config = {
-#     'SMA': {
-#         'mod': SMA,
-#         'args': {
-#             'n_periods': [3, 5, 8, 13, 21],
-#             'interval' : [1, 3, 5, 8, 13, 15],
-#             'shift'    : [0, 1, 2, 3, 5, 8],
-#         }
-#     },
-#     'RSI': {
-#         'mod': RSI,
-#         'args': {
-#             'n_periods': [9, 13, 21],
-#             'on_threshold': [20, 25, 30, 35, 40],
-#             'off_threshold': [10, 15, 20, 25, 30],
-#             'interval' : [1, 3, 5, 8, 13, 15],
-#             'shift'    : [0, 1, 2, 3, 5, 8],
-#         }
-#     },
-# }
+# strategies
+strats = []
 
-generator_config = {
-    'SMA': {
-        'mod': SMA,
-        'args': {
-            'n_fast': [3, 5, 8, 13, 21],
-            'n_slow': []
-            'interval' : [1, 3, 5, 8, 13, 15],
-            'shift'    : [0, 1, 2, 3, 5, 8],
-        }
-    },
-}
+# strategies += [cstrategy.SMA(
+#     n_fast   = f, 
+#     n_slow   = s, 
+#     atr_n    = 10,
+#     atr_scale = 4,
+#     interval = 10, 
+#     shift    = 0) 
+#     for f in [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180]
+#     for s in [30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 240, 280, 320]
+#     # for sf in [0, 1, 2, 3, 5]
+#     if cstrategy.SMA.validate(f, s, 1, 0)]
 
-# generate strategies
-strategies = []
-for v in generator_config.values():
-    mod = v['mod']
-    args_name = list(v['args'].keys())
-    args_value = list(itertools.product(*[v['args'][k] for k in args_name]))
-    args = [dict(zip(args_name, x)) for x in args_value]
-    strategies += [mod(**x) for x in args if x['interval'] > x['shift']]
+# strategies += [cstrategy.RSI(
+#     n_periods     = n, 
+#     on_threshold  = on, 
+#     off_threshold = off, 
+#     # atr_n = 5,
+#     # atr_scale = 2,
+#     interval = 10, 
+#     shift    = 0) 
+#     for n in [7, 14, 21]
+#     for on in [20, 30, 40]
+#     for off in [-40, -30, -20, -10, 0, 10, 20, 30]
+#     # for i in [1, 3, 5, 7, 10, 13, 15, 21]
+#     # for sf in [0, 1, 2, 3, 5]
+#     if cstrategy.RSI.validate(n, on, off, 5, 0)]
+
+# strategies += [cstrategy.ATR_RSI(
+#     atr_n     = atrn, 
+#     atr_ma    = atrm, 
+#     rsi_n     = rsin,
+#     rsi_entry = rsie,
+#     fix_loss  = 30, 
+#     interval  = i, 
+#     shift     = 0) 
+#     for atrn in [5, 10, 15, 20, 30]
+#     for atrm in [5, 10, 15, 20, 30]
+#     for rsin in [5, 10, 15, 20, 30]
+#     for rsie in [10, 20, 30, 40]
+#     for i    in [3, 5, 10, 15]]
+
+strats += [strategies.cstrategy.DUAL_THRUST(
+    n_days = n,
+    fix_loss = fl,
+    upper_scale = us, # ~0.2
+    lower_scale = ls) # ~0.2
+    for n in [1, 2, 3, 4, 5, 6, 8, 10]
+    for us in [x / 4 for x in range(1, 13)]
+    for ls in [x / 4 for x in range(1, 13)]
+    # for us in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    # for ls in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    for fl in [20.0, 25.0, 30.0]]
+
+# strats = [strategies.cstrategy.DUAL_THRUST(
+#     n_days = 1,
+#     fix_loss = 30,
+#     upper_scale = 0.5,
+#     lower_scale = .75
+# )]
+
+
+
+# strategies += [cstrategy.R_BREAKER(
+#     reverse_scale = rs,
+#     break_scale   = bs,
+#     pivot_scale   = 1.0,
+#     pivot_shift   = 1.0,
+#     fix_loss      = 30)
+#     for rs in [0.8, 1.0, 1.2]
+#     for bs in [1.5, 1.75, 2.0, 2.25, 2.5]]
+#     # for psc in [0.95, 1.0, 1.05]
+#     # for psh in [0.9, 1.0, 1.1]]
 
 # run backtest
-iee = IntradayEventEngine(fd)
-iee.load_strategies(strategies)
+iee = backtester.cbacktest.IntradayEventEngine(fd)
+iee.load_strategies(strats)
 t = time.time()
 iee.run(
     start_date = START_DATE, 
     end_date = END_DATE,
-    config = {'transaction_cost': 0.25}
+    config = {'transaction_cost': 0.5}
 )
 print('Running Time: {:.2f}'.format(time.time() - t))
-        
-# run optimization
-po = PortfolioOptimizer(history['wealth'])
-opt_portfolio = po.solve(30)
+print('Snap Time: {:.2f}'.format(iee.time['snap']))
+print('Execution Time: {:.2f}'.format(iee.time['execute_orders']))
+print('Strategies Time: {:.2f}'.format(iee.time['strategies']))
+print('Update Snap Time: {:.2f}'.format(iee.time['update_snap']))
+print('Record Time: {:.2f}'.format(iee.time['record']))
+    
+history = iee.get_history()
+res     = backtest_analytics(history['wealth'], history['position'])
 
-# plot result
-wealth = iee.get_history()[opt_portfolio.index].sum(axis = 1) - 100000
+# filtering
+filtered_res = res[res.trades > 50]
+filtered_res = filtered_res[filtered_res.wealth > min(filtered_res.wealth.mean(), 0)]
+filtered_res = filtered_res[filtered_res.sharpe > 2]
+# filtered_res = filtered_res[filtered_res]
 
 
-
-from kplot import kplot
+# plot best one
+filtered_res = res.sort_values('calmar')
+best_idx = -1
+wealth   = history['wealth'][filtered_res.index[best_idx]]
 bkt_data = fd.get_market_data(START_DATE, END_DATE)
-kplot(bkt_data)
+kplot(bkt_data, wealth = wealth, position = history['position'][filtered_res.index[best_idx]])
 
 
-
-
-
-
-
-
-
-
-sg            = StrategyGenerator(fd)
-strategies    = sg.generate(generator_config, START_DATE, END_DATE)
-
-
-# filter strategies
-details = pd.DataFrame({k: v['details'] for k, v in strategies.items()}).T
-details = details.loc[details.signal_count > 100]
-filtered_strats = {k: strategies[k] for k in details.index}
-strats_return = pd.concat([pd.Series(v['wealth'].diff().fillna(0), name = k) for k, v in filtered_strats.items()], axis = 1)
-strats_return = strats_return.loc[strats_return.index < '2019-08-30']
-strats_std    = strats_return.rolling(20).std().mean().sort_values()
-strats_std    = strats_std.loc[strats_std < 1.5]
-filtered_strats = {k: strategies[k] for k in strats_std.index}
-
-
-po            = PortfolioOptimizer(filtered_strats)
-opt_portfolio = po.solve(
-    n_strategies  = 20,
-    return_lambda = 0.5,
-    start_date    = None,
-    end_date      = datetime.date(2019, 8, 30)
+# run optimization
+rolling_period = 1125
+return_data = history['wealth'][filtered_res.index].diff().fillna(0)
+return_data = return_data.clip(
+    # lower = return_data.rolling(rolling_period).quantile(0.005),
+    # upper = return_data.rolling(rolling_period).quantile(0.995)
+    lower = -10,
+    upper = 10
 )
+# po = PortfolioOptimizer(return_data)
+# opt_portfolio = po.solve(30, return_lambda = 1.0)
+
+# # plot result
+# opt_wealth   = pd.DataFrame(history['wealth'][opt_portfolio.index].mean(axis = 1), columns = ['OPT'])
+# opt_position = pd.DataFrame(history['position'][opt_portfolio.index].mean(axis = 1), columns = ['OPT'])
+# opt_res      = backtest_analytics(opt_wealth, opt_position)
+# bkt_data     = fd.get_market_data(START_DATE, END_DATE)
+# kplot(bkt_data, wealth = opt_wealth['OPT'])
 
 
-# plot result
-bkt_data = fd.get_min_bar(
-    interval   = 1,
-    shift      = 0,
-    trim       = False,
-    start_date = START_DATE,
-    end_date   = END_DATE,
-)
-wealth = None
-for s in opt_portfolio.index:
-    wealth = strategies[s]['wealth'] if wealth is None else wealth + strategies[s]['wealth'] 
-kplot(bkt_data, wealth = wealth)
 
 
-kplot(bkt_data, wealth = filtered_strats[opt_portfolio.index[7]]['wealth'])
+
+
+
+
+
 
 
